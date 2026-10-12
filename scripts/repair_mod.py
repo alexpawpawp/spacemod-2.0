@@ -70,8 +70,8 @@ for file in (resources/"data/spacemod/dimension").glob("*.json"):
     file.write_text(json.dumps(obj,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
 
 items=(java/"ModItems.java").read_text(encoding="utf-8")
-names=set(re.findall(r'ITEMS\\.register\\("([a-z0-9_]+)"',items))
-names.update(re.findall(r'\\breg\\("([a-z0-9_]+)"',items))
+names=set(re.findall(r'ITEMS\.register\("([a-z0-9_]+)"',items))
+names.update(re.findall(r'\breg\("([a-z0-9_]+)"',items))
 models=assets/"models/item"
 textures=assets/"textures/item"
 models.mkdir(parents=True,exist_ok=True)
