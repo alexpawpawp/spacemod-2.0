@@ -55,6 +55,28 @@ jobs:
           print('Java files:', len(list((dest / 'src/main/java').rglob('*.java'))))
           PY
 
+      - name: Fix Forge 1.20.1 source compatibility
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          base = Path('_spacemod_build/src/main/java/com/spacemod')
+          telescope = base / 'item/TelescopeItem.java'
+          content = telescope.read_text(encoding='utf-8')
+          for planet in ('MARS', 'MOON', 'EUROPA'):
+              content = content.replace(f'RocketEntity.{planet}', f'RocketEntity.dim("{planet.lower()}")')
+          telescope.write_text(content, encoding='utf-8')
+
+          manager = base / 'world/OpenSpaceManager.java'
+          content = manager.read_text(encoding='utf-8')
+          before = 'level.getEntities().getAll().stream()'
+          after = 'java.util.stream.StreamSupport.stream(level.getEntities().getAll().spliterator(), false)'
+          if before not in content:
+              raise SystemExit('Expected entity stream expression missing; inspect OpenSpaceManager.java')
+          manager.write_text(content.replace(before, after), encoding='utf-8')
+          print('Applied TelescopeItem and OpenSpaceManager compilation fixes')
+          PY
+
       - name: Build Forge mod
         run: gradle -p _spacemod_build build --no-daemon --stacktrace
 
