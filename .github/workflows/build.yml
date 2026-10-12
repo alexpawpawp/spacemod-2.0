@@ -75,6 +75,11 @@ jobs:
           print('Applied TelescopeItem and OpenSpaceManager compilation fixes')
           PY
 
+      - name: Repair gameplay and generate missing assets
+        run: |
+          python3 -m pip install --quiet Pillow
+          python3 scripts/repair_mod.py
+
       - name: Build Forge mod
         run: gradle -p _spacemod_build build --no-daemon --stacktrace
 
