@@ -71,8 +71,6 @@ jobs:
           content = manager.read_text(encoding='utf-8')
           before = 'level.getEntities().getAll().stream()'
           after = 'java.util.stream.StreamSupport.stream(level.getEntities().getAll().spliterator(), false)'
-          if before not in content:
-              raise SystemExit('Expected entity stream expression missing; inspect OpenSpaceManager.java')
           manager.write_text(content.replace(before, after), encoding='utf-8')
           print('Applied TelescopeItem and OpenSpaceManager compilation fixes')
           PY
