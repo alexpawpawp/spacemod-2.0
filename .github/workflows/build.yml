@@ -1,4 +1,4 @@
-name: Build mod
+name: Build SpaceMod Forge
 
 on:
   push:
@@ -14,16 +14,68 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: '17'
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: 8.5
+          gradle-version: '8.5'
 
-      - name: Build
-        run: gradle build --no-daemon
+      - name: Prepare SpaceMod sources
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib, zipfile, shutil, sys
+          root = pathlib.Path('.')
+          dest = pathlib.Path('_spacemod_build')
+          candidates = []
+          for p in root.rglob('build.gradle'):
+              if '.git' not in p.parts and 'src' in [q.name for q in p.parent.iterdir() if q.is_dir()]:
+                  candidates.append(p.parent)
+          if not candidates:
+              archives = sorted(root.glob('*SpaceModForge*.zip'))
+              if not archives:
+                  sys.exit('ERROR: No SpaceModForge source directory or ZIP found. Upload SpaceModForge-build-ready.zip to repository root.')
+              with zipfile.ZipFile(archives[-1]) as z:
+                  for info in z.infolist():
+                      path = pathlib.PurePosixPath(info.filename)
+                      if path.is_absolute() or '..' in path.parts:
+                          sys.exit('ERROR: Unsafe path in ZIP')
+                  z.extractall('_extracted_sources')
+              candidates = [p.parent for p in pathlib.Path('_extracted_sources').rglob('build.gradle') if (p.parent / 'src/main/java').exists()]
+          if not candidates:
+              sys.exit('ERROR: No build.gradle with src/main/java found.')
+          source = next((p for p in candidates if (p / 'src/main/resources/META-INF/mods.toml').exists()), None)
+          if source is None:
+              sys.exit('ERROR: mods.toml not found in sources.')
+          if not list((source / 'src/main/java').rglob('*.java')):
+              sys.exit('ERROR: No Java sources found.')
+          if source.resolve() != dest.resolve():
+              shutil.copytree(source, dest, dirs_exist_ok=True)
+          print('Using source:', source)
+          print('Java files:', len(list((dest / 'src/main/java').rglob('*.java'))))
+          PY
+
+      - name: Build Forge mod
+        run: gradle -p _spacemod_build build --no-daemon --stacktrace
+
+      - name: Reject empty JAR
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import zipfile, pathlib, sys
+          jars = list(pathlib.Path('_spacemod_build/build/libs').glob('*.jar'))
+          if not jars:
+              sys.exit('ERROR: No JAR produced')
+          for jar in jars:
+              with zipfile.ZipFile(jar) as z:
+                  names = z.namelist()
+                  if not any(n.endswith('.class') for n in names) or not any(n.endswith('META-INF/mods.toml') for n in names):
+                      sys.exit(f'ERROR: {jar} has no classes or mods.toml')
+                  print(f'VALID JAR: {jar}, {len(names)} entries')
+          PY
 
       - uses: actions/upload-artifact@v4
         with:
           name: spacemod-jar
-          path: build/libs/*.jar
+          path: _spacemod_build/build/libs/*.jar
+          if-no-files-found: error
